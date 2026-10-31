@@ -1,0 +1,19 @@
+#!/bin/sh
+# lspec pre-commit: confirm the candidate matches the reconcile receipt —
+# HEAD, Git's selected index and the checker being committed. Every check
+# ran in reconcile, so a refusal means something changed after it.
+# Install with the other hooks (README):
+#   ln -sf ../../hooks/pre-commit .git/hooks/pre-commit
+set -e
+root=$(git rev-parse --show-toplevel)
+# Git may hand hooks a *relative* GIT_DIR/GIT_INDEX_FILE — pin both absolute.
+export GIT_DIR="$(git rev-parse --absolute-git-dir)"
+export GIT_INDEX_FILE="$(git rev-parse --path-format=absolute --git-path index)"
+export GIT_OPTIONAL_LOCKS=0
+tmp=$(mktemp -d "$GIT_DIR/lspec-hook.XXXXXX")
+trap 'rm -rf "$tmp"' EXIT
+# Run the checker being committed, falling back to the working-tree one.
+tool="$tmp/lspec.py"
+git -C "$root" show :lspec.py > "$tool" 2>/dev/null || tool="$root/lspec.py"
+cd "$root"
+python3 "$tool" hook pre-commit

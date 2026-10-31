@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<!-- The Living Specification for zed-fireworks: the durable, cross-session state of the sync tool. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>zed-fireworks &mdash; Living Specification</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/light.css">
+</head>
+<body>
+
+<main>
+
+<h1 id="top">zed-fireworks</h1>
+
+<p id="status"><strong>Status:</strong> live-system, maintained &mdash; the tool runs from a daily systemd user timer and its actual behavior is the committed script (<a href="#dl-selfregime">dl-selfregime</a>).<br>
+<strong>Locked:</strong> models.dev as the catalog source (<a href="#dl-catalog">dl-catalog</a>), Zed's <code>openai_compatible.fireworks</code> provider as the target (<a href="#dl-target">dl-target</a>), the full capability set (<a href="#kp-caps">kp-caps</a>), the merge order (<a href="#kp-merge">kp-merge</a>), JSONC splice preservation (<a href="#dl-jsonc">dl-jsonc</a>), the atomic write (<a href="#kp-write">kp-write</a>), and one stdlib-only file (<a href="#dl-stdlib">dl-stdlib</a>).<br>
+<strong>Open:</strong> <a href="#watch-capability-set">watch-capability-set</a>, <a href="#watch-effort-menu">watch-effort-menu</a> (<a href="#open">Open Items</a>).<br>
+<strong>Top risk:</strong> an upstream catalog or Zed schema change lands after a sync, so the timer writes a rejected or incomplete settings file (<a href="#watch-capability-set">watch-capability-set</a>).<br>
+<strong>Last full sweep:</strong> none &mdash; no <code>audit:</code> commit exists yet (<a href="#record">Record</a>).<br>
+<strong>Read every line of this file before acting</strong>; it is the load unit. With the tool installed, begin with <code>python3 lspec.py start zed-fireworks-spec.html</code>.</p>
+
+<p id="directive"><strong>Ethos:</strong> treat Zed's settings file as a guest: change only the one managed array, assert every contract before writing, and leave a recoverable backup whenever the content changes.</p>
+
+<p id="conventions"><strong>Conventions:</strong> read this file whole before acting; it is the only file in the collection. Every value lives once in <a href="#params">Key Parameters</a> or is indexed from its authority: actual behavior is <code>zed-fireworks-sync.py</code> at its version line; required behavior is the rows below and the <a href="#log">Decision Log</a>; conformance evidence is a <code>--dry-run</code> output or the backup. Status tokens, one per axis: <code>confirmed(source) / provisional(source); locked / open; WATCH</code>. Inline <code>[WATCH]</code> markers link a <a href="#open">watch entry</a>; dates live there, not inline. Git holds history; body text is present tense and links to rationale. Decisions use <code>dl-</code> row ids; each row opens its first cell with that id in <code>&lt;code&gt;</code>, uncounted; each cell is at most 40 words. Replace a superseded row, keeping the displaced choice in its successor's rejected/replaced cell. Retain a row only if a fresh session might re-propose its rejected alternative. For an assumption-dependent lock, name the assumption and reopening condition. Change the <a href="#fence">scope fence</a> and log the decision before reintroducing an excluded option. A change to a <code>data-sealed</code> claim is a decision change, recorded in a <code>dl-</code> row in the same commit, or a correction with its reason naming the decision it restores, else confirmed by a later session's <code>review:</code> commit naming it.</p>
+
+<p id="session"><strong>Session:</strong> load &rarr; make one move &rarr; update the canonical state &rarr; reconcile touched claims and their one-hop neighbors &rarr; commit &rarr; confirm a clean working tree. Check referrers, cited evidence, copies, counts, status, declared counterparts, dependents, and indexed artifacts; follow up only into neighbors changed by the fixes. Report a missing instruction referent; state your interpretation and clarify if alternatives would materially change the edit. If you cannot ask, take the reading that changes least and record the alternative as an open item. Commit types: <code data-commit-types>docs feat fix seed audit review</code>; each subject is one typed transition line pointing to rationale, never restating it. Seed and review bodies may carry assessments.</p>
+
+<p id="dependencies"><strong>Dependencies:</strong> put <code>&lt;a rel="depends-on" href="#target"&gt;</code> inside the dependent claim. Its nearest id'd ancestor names that claim. Both anchors enclose complete claims: a paragraph, section, or table row; a heading covers only its title. Plain links are navigation. The collection is one file, so a dependency stays in-file. A changed or missing target owes review: confirm or fix the dependent and record it in a <code>review:</code> commit naming the claim, or in the target's own commit when its gate confirms the dependent unchanged. Removing or redirecting a dependency of a surviving claim takes a review; deleting the dependent claim retires its obligations. Uncommitted edits clear nothing. Review history lives in git.</p>
+
+<p id="tooling"><strong>Tooling:</strong> begin with <code>python3 lspec.py start zed-fireworks-spec.html</code> and follow its output. Without the tool, perform its checks by hand. This instance carries its own copy of <code>lspec.py</code> and <code>hooks/</code>; never link a methodology repository in their place.</p>
+
+<h2 id="params">Key Parameters &mdash; single source of truth</h2>
+<table>
+<thead><tr><th>Parameter</th><th>Value</th><th>Status &middot; provenance</th></tr></thead>
+<tbody>
+<tr id="kp-catalog"><td>Catalog source</td><td><code>https://models.dev/api.json</code></td><td>confirmed &mdash; <code>URL</code> in the script</td></tr>
+<tr id="kp-endpoint"><td>Fireworks endpoint</td><td><code>https://api.fireworks.ai/inference/v1</code>; asserted before any write</td><td>confirmed &mdash; <code>ENDPOINT</code> and <code>models()</code></td></tr>
+<tr id="kp-target"><td>Managed Zed setting</td><td><code>language_models.openai_compatible.fireworks</code>; no other setting is read or written</td><td>confirmed &mdash; <code>sync()</code></td></tr>
+<tr id="kp-settings"><td>Settings path</td><td><code>$XDG_CONFIG_HOME/zed/settings.json</code>, else <code>~/.config/zed/settings.json</code>; <code>--settings PATH</code> overrides</td><td>confirmed &mdash; <code>main()</code></td></tr>
+<tr id="kp-filter"><td>Model filter</td><td><code>tool_call: true</code> and <code>status</code> not <code>deprecated</code> or <code>retired</code></td><td>confirmed &mdash; <code>models()</code></td></tr>
+<tr id="kp-entry"><td>Entry fields</td><td><code>name</code>, <code>display_name</code>, <code>max_tokens</code> = catalog context limit, <code>capabilities</code></td><td>confirmed &mdash; <code>models()</code></td></tr>
+<tr id="kp-caps" data-sealed><td>Required capabilities</td><td>All seven on every entry: <code>tools</code>, <code>images</code>, <code>parallel_tool_calls</code>, <code>prompt_cache_key</code>, <code>chat_completions</code>, <code>interleaved_reasoning</code>, <code>max_tokens_parameter</code></td><td>confirmed &mdash; Zed schema <a href="#watch-capability-set">[WATCH]</a></td></tr>
+<tr id="kp-reasoning"><td>Reasoning default</td><td><code>reasoning_effort: "high"</code> when catalog <code>reasoning: true</code>; an explicit existing value wins via <a rel="depends-on" href="#kp-merge">the merge order</a>, including <code>null</code></td><td>confirmed &mdash; version <code>2026-10-11-effort-fix</code> <a href="#watch-effort-menu">[WATCH]</a></td></tr>
+<tr id="kp-merge" data-sealed><td>Merge order</td><td>defaults &rarr; existing entry &rarr; catalog entry; overrides last</td><td>confirmed &mdash; <code>models()</code></td></tr>
+<tr id="kp-retain"><td>Absent models</td><td>Models missing from the latest catalog are kept from <a rel="depends-on" href="#kp-merge">the existing set</a>, so an omission cannot drop a selected or private model</td><td>confirmed &mdash; <code>models()</code></td></tr>
+<tr id="kp-overrides"><td>Overrides file</td><td>Applied after <a rel="depends-on" href="#kp-merge">the merge order</a>; <code>fireworks-model-overrides.json</code> beside settings; unknown model ID fails</td><td>confirmed &mdash; <code>sync()</code></td></tr>
+<tr id="kp-write" data-sealed><td>Write protocol</td><td>JSONC parsed with source offsets; only <code>available_models</code> is spliced; atomic <code>tempfile</code> + <code>os.replace</code> under a non-blocking <code>flock</code>; other settings and comments survive byte-for-byte</td><td>confirmed &mdash; <code>parse()</code>, <code>set_path()</code>, <code>sync()</code></td></tr>
+<tr id="kp-backup"><td>Backup</td><td><code>settings.json.fireworks-sync.bak</code>, mode <code>0600</code>, written under <a rel="depends-on" href="#kp-write">the write protocol</a>, only when content changes</td><td>confirmed &mdash; <code>sync()</code></td></tr>
+<tr id="kp-timer"><td>Timer</td><td>systemd user units; <code>OnStartupSec=2min</code>, <code>OnUnitActiveSec=1d</code>, <code>RandomizedDelaySec=2min</code>; runs the deployed copy with <a rel="depends-on" href="#kp-settings">the resolved settings path</a></td><td>confirmed &mdash; <code>install()</code></td></tr>
+<tr id="kp-runtime"><td>Runtime</td><td>Python 3.9+, stdlib only, one file</td><td>confirmed &mdash; imports</td></tr>
+<tr id="kp-version"><td>Artifact version</td><td><code>2026-10-11-effort-fix</code>, in the module docstring</td><td>confirmed &mdash; <code>zed-fireworks-sync.py</code></td></tr>
+<tr id="kp-catalog-cap"><td>Catalog size cap</td><td>32 MiB; a larger response is rejected</td><td>confirmed &mdash; <code>fetch()</code></td></tr>
+<tr id="kp-import"><td>Imported capability</td><td>Metadata only; account access and tool execution depend on Fireworks/model compatibility and Zed's Write profile</td><td>confirmed &mdash; module docstring</td></tr>
+</tbody>
+</table>
+
+<h2 id="open">Open Items</h2>
+<p>A watch entry is a row whose id starts <code>watch-</code>; its first cell opens with that id in <code>&lt;code&gt;</code>. Inline <code>[WATCH]</code> markers link here. A failure seen once, even if root-caused, gets an entry: symptom, date, diagnosis, fix.</p>
+<table>
+<thead><tr><th>Item</th><th>Gates</th><th>Resolves when</th></tr></thead>
+<tbody>
+<tr id="watch-capability-set"><td><code>watch-capability-set</code> 2026-10-31, recorded in the material: Zed rejected the whole settings file with <code>missing field parallel_tool_calls</code>. Diagnosis: an entry omitted part of the required capability set. Fix: all seven fields are emitted on every entry, nested as Zed expects.</td><td>Zed accepting the generated file; the <a href="#kp-caps">kp-caps</a> contract</td><td>A later sync against a changed Zed schema succeeds without an edit, or a full sweep confirms the seven fields still match the schema</td></tr>
+<tr id="watch-effort-menu"><td><code>watch-effort-menu</code> 2026-10-11, version <code>2026-10-11-effort-fix</code>: reasoning models showed no effort control. Diagnosis: Zed needs a non-null <code>reasoning_effort</code> and exposes one generic menu. Fix: default <code>high</code>, preserving an explicit existing value.</td><td>Zed's reasoning and effort controls; the <a href="#kp-reasoning">kp-reasoning</a> default</td><td>A Zed release changes how reasoning effort is exposed, or a full sweep confirms the generic menu still reads the value</td></tr>
+</tbody>
+</table>
+
+<h2 id="log">Decision Log</h2>
+<table>
+<thead><tr><th>Selection</th><th>Rejected / Replaced</th><th>Reason</th></tr></thead>
+<tbody>
+<tr id="dl-catalog"><td><code>dl-catalog</code> Use models.dev's Fireworks provider as the catalog.</td><td>Hand-maintained model list; import OpenCode runtime logic.</td><td>Upstream metadata already keyed by provider, one unauthenticated fetch, refreshed daily.</td></tr>
+<tr id="dl-target"><td><code>dl-target</code> Write Zed's <code>openai_compatible.fireworks</code> provider.</td><td>A Zed extension; a local proxy.</td><td>Zed already speaks the OpenAI-compatible Fireworks API; one managed array is the whole integration.</td></tr>
+<tr id="dl-jsonc"><td><code>dl-jsonc</code> Parse JSONC with source offsets; splice only the managed array.</td><td>Re-serialize the whole file; regex replacement.</td><td>Comments and every other setting survive byte-for-byte; managed-array comments are the declared exception.</td></tr>
+<tr id="dl-merge"><td><code>dl-merge</code> Merge defaults, existing entry, catalog entry; overrides last.</td><td>Catalog overwrites user options; existing entry wins outright.</td><td>Catalog fields refresh while non-catalog machine-local options survive.</td></tr>
+<tr id="dl-retain"><td><code>dl-retain</code> Retain models absent from the latest catalog.</td><td>Treat the catalog as complete truth.</td><td>An upstream omission cannot drop a selected or private model.</td></tr>
+<tr id="dl-caps"><td><code>dl-caps</code> Emit the full seven-field capability set on every entry.</td><td>Emit only capabilities the catalog reports.</td><td>Zed rejects the entire settings file when one required field is missing.</td></tr>
+<tr id="dl-effort"><td><code>dl-effort</code> Default <code>reasoning_effort</code> to <code>"high"</code> for reasoning models.</td><td>Leave it null; maintain per-model supported-level lists.</td><td>Zed needs a non-null value to expose its generic effort menu and publishes no per-model list.</td></tr>
+<tr id="dl-overrides"><td><code>dl-overrides</code> Read per-model patches from <code>fireworks-model-overrides.json</code> beside settings.</td><td>Overrides in the repo; CLI flags; ignoring unknown IDs.</td><td>Machine-local patches survive syncs; a renamed model fails loud instead of silently untouched.</td></tr>
+<tr id="dl-write"><td><code>dl-write</code> Atomic replace under a non-blocking lock, with a mode-0600 backup.</td><td>In-place write; queue behind a concurrent run.</td><td>A crash cannot leave a partial settings file; a second run fails fast.</td></tr>
+<tr id="dl-timer"><td><code>dl-timer</code> Self-copy to <code>~/.local/lib</code> and install a systemd user timer.</td><td>Cron; run the repo checkout directly.</td><td>Moving or renaming the repo cannot disturb the timer; a user session needs no root.</td></tr>
+<tr id="dl-stdlib"><td><code>dl-stdlib</code> One stdlib-only Python file.</td><td>A package depending on <code>requests</code> or <code>httpx</code>.</td><td>Copy-and-run on any Python 3.9+ machine with no install step or virtualenv.</td></tr>
+<tr id="dl-refusal"><td><code>dl-refusal</code> Abort and leave settings unchanged on endpoint, catalog-shape, or override errors.</td><td>Best-effort write with warnings.</td><td>A rejected settings file breaks the editor; an unchanged file plus a nonzero exit is recoverable.</td></tr>
+<tr id="dl-selfregime"><td><code>dl-selfregime</code> Declare this spec live-system, maintained, indexed by the committed script.</td><td>Forward-design classification; declaring no regime.</td><td>The tool already runs on a timer; actual behavior lives in the script, so the spec indexes it.</td></tr>
+</tbody>
+</table>
+
+<h2 id="fence">Out of Scope</h2>
+<ul>
+<li>Reading, storing, or proxying API keys; Zed's provider credentials are untouched.</li>
+<li>Managing any other setting, keymap, theme, or non-Fireworks provider.</li>
+<li>Importing OpenCode runtime logic or guaranteeing account access and tool execution.</li>
+<li>Installing timers on non-systemd or non-Linux systems; the sync itself stays portable.</li>
+<li>Validating model-specific reasoning-effort levels; Zed's menu is generic.</li>
+</ul>
+
+<h2 id="record">Record</h2>
+<p>Git is the record: every session-event is a commit; every full sweep takes an <code>audit:</code> commit, empty only when no files change. A clean sweep may update bookkeeping. No in-file history; the script's module docstring carries the artifact version.</p>
+
+</main>
+</body>
+</html>

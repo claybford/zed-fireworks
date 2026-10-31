@@ -9,10 +9,27 @@ One stdlib-only Python file. No API keys are read or written.
 
 ## Files
 
-| File | Purpose |
-|---|---|
-| `zed-fireworks-sync.py` | The whole tool: fetch, merge, write. Also installs the daily systemd user timer. Artifact version is in the module docstring. |
-| `fireworks-model-overrides.json` | Hand-maintained per-model patch map, applied last. Ships as `{}`. |
+| File                             | Purpose                                                                                                                                     |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `zed-fireworks-sync.py`          | The whole tool: fetch, merge, write. Also installs the daily systemd user timer. Artifact version is in the module docstring.               |
+| `fireworks-model-overrides.json` | Hand-maintained per-model patch map, applied last. Ships as `{}`.                                                                           |
+| `zed-fireworks-spec.html`        | The [Living Specification](https://github.com/claybford/live-spec) for this tool: canonical values, decisions, open items, and scope fence. |
+| `lspec.py`, `hooks/`             | The spec's validator, commit gate, and git hooks. Stdlib only; run `python3 lspec.py --help`.                                               |
+| `AGENTS.md`                      | One instruction for a cold agent session: run `python3 lspec.py start zed-fireworks-spec.html`.                                             |
+
+## Living specification
+
+This repository is also a Live Spec instance. Open
+`zed-fireworks-spec.html` for the canonical state; start an agent session
+with `python3 lspec.py start zed-fireworks-spec.html`. The first session
+commit after a clone should install the hooks:
+
+```sh
+ln -sf ../../hooks/pre-commit .git/hooks/pre-commit
+ln -sf ../../hooks/commit-msg .git/hooks/commit-msg
+ln -sf ../../hooks/prepare-commit-msg .git/hooks/prepare-commit-msg
+ln -sf ../../hooks/post-commit .git/hooks/post-commit
+```
 
 ## Requirements
 
@@ -38,8 +55,8 @@ Only `language_models.openai_compatible.fireworks` inside `settings.json`:
 - `available_models` — regenerated from the catalog, sorted by model ID
 
 The file is parsed as JSONC with source offsets, so comments and every other
-setting survive byte-for-byte. The generated array is managed: comments *inside
-it* are replaced, comments elsewhere are kept. The write is atomic (`tempfile` +
+setting survive byte-for-byte. The generated array is managed: comments _inside
+it_ are replaced, comments elsewhere are kept. The write is atomic (`tempfile` +
 `os.replace`) under a `flock` (a concurrent run fails fast instead of queueing),
 and the previous version is copied to `settings.json.fireworks-sync.bak`
 (mode 0600) whenever the content actually changes.
@@ -63,7 +80,7 @@ merged set fails loud on purpose: model renames must be noticed.
 ## Gotchas (load-bearing)
 
 - **Zed requires the full capability set on every entry.** All seven fields must
-  be present; `parallel_tool_calls` and `prompt_cache_key` live *inside*
+  be present; `parallel_tool_calls` and `prompt_cache_key` live _inside_
   `capabilities`, not at the model top level. Omitting one makes Zed reject the
   entire settings file (`missing field parallel_tool_calls`).
 - **Reasoning models get `reasoning_effort: "high"` by default.** Zed needs a

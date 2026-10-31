@@ -1,0 +1,20 @@
+#!/bin/sh
+# lspec prepare-commit-msg: write the reconciled subject, any body, and the
+# Reconciled: trailers from the receipt; other trailers you supply are kept.
+# Commit with `git commit --no-edit`. Install:
+#   ln -sf ../../hooks/prepare-commit-msg .git/hooks/prepare-commit-msg
+set -e
+root=$(git rev-parse --show-toplevel)
+case "$1" in
+  /*) msg="$1" ;;
+  *)  msg="$root/$1" ;;
+esac
+export GIT_DIR="$(git rev-parse --absolute-git-dir)"
+export GIT_INDEX_FILE="$(git rev-parse --path-format=absolute --git-path index)"
+export GIT_OPTIONAL_LOCKS=0
+tmp=$(mktemp -d "$GIT_DIR/lspec-hook.XXXXXX")
+trap 'rm -rf "$tmp"' EXIT
+tool="$tmp/lspec.py"
+git -C "$root" show :lspec.py > "$tool" 2>/dev/null || tool="$root/lspec.py"
+cd "$root"
+python3 "$tool" hook prepare-commit-msg "$msg" ${2:+"$2"}
