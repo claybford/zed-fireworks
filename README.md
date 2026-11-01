@@ -52,7 +52,8 @@ Default target: `$XDG_CONFIG_HOME/zed/settings.json`, else `~/.config/zed/settin
 Only `language_models.openai_compatible.fireworks` inside `settings.json`:
 
 - `api_url` — asserted to be `https://api.fireworks.ai/inference/v1`
-- `available_models` — regenerated from the catalog, sorted by model ID
+- `available_models` — regenerated from the catalog, sorted by model ID; entries
+  carry `max_tokens` and, when the catalog provides it, `max_output_tokens`
 
 The file is parsed as JSONC with source offsets, so comments and every other
 setting survive byte-for-byte. The generated array is managed: comments _inside
@@ -83,6 +84,9 @@ merged set fails loud on purpose: model renames must be noticed.
   be present; `parallel_tool_calls` and `prompt_cache_key` live _inside_
   `capabilities`, not at the model top level. Omitting one makes Zed reject the
   entire settings file (`missing field parallel_tool_calls`).
+- **Zed's split token ring divides output tokens by `max_output_tokens`.** An
+  entry without it shows `Output: 1.9k / 0` and a permanently full output ring.
+  The tool imports the catalog's `limit.output` whenever present.
 - **Reasoning models get `reasoning_effort: "high"` by default.** Zed needs a
   non-null value to expose its generic effort menu. Explicit existing values
   (including `null`) win over the default, and overrides still apply last.

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Sync models.dev Fireworks metadata into Zed Agent. Python 3.9+, no dependencies.
 
-Version: 2026-10-11-effort-fix
+Version: 2026-10-31-output-limit
+Output limits are imported so Zed's split token rings have a denominator.
 Reasoning models default to high effort; explicit existing values take precedence.
 Zed exposes a generic effort menu, not a model-specific supported-level list.
 
@@ -135,8 +136,12 @@ def models(catalog, existing, overrides):
     fresh = {}
     for mid, m in provider['models'].items():
         if m.get('tool_call') is not True or m.get('status') in ('deprecated', 'retired'): continue
-        context = m.get('limit', {}).get('context')
+        limit = m.get('limit', {})
+        context = limit.get('context')
+        output = limit.get('output')
         if not isinstance(mid, str) or type(context) is not int or context <= 0:
+            raise ValueError('Invalid catalog model metadata')
+        if output is not None and (type(output) is not int or output <= 0):
             raise ValueError('Invalid catalog model metadata')
         interleaved = m.get('interleaved')
         # Zed's capability schema requires the full field set on every entry
@@ -147,7 +152,12 @@ def models(catalog, existing, overrides):
                 'chat_completions': True,
                 'interleaved_reasoning': isinstance(interleaved, dict) and interleaved.get('field') == 'reasoning_content',
                 'max_tokens_parameter': False}
-        entry = {'name': mid, 'display_name': m.get('name', mid), 'max_tokens': context, 'capabilities': caps}
+        entry = {'name': mid, 'display_name': m.get('name', mid), 'max_tokens': context}
+        # Zed's split token display divides output tokens by this value; without
+        # it a 0 denominator paints a permanently full output ring.
+        if output is not None:
+            entry['max_output_tokens'] = output
+        entry['capabilities'] = caps
         # Fireworks reasoning models accept reasoning_effort; Zed requires a
         # non-null default to expose its generic thinking/effort controls.
         # Preserve explicit settings, including null, and apply overrides below.
